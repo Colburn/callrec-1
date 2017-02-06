@@ -23,7 +23,7 @@ echo -n "Enter the community string you would like to replace (don't use 'callre
 
 read old
 
-echo -n "\nEnter the community string you would like to use: " 
+echo -n "Enter the community string you would like to use: " 
 
 read new
 
