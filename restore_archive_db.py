@@ -1,20 +1,21 @@
 import lxml.etree as ET
 import pg
 import glob
+import os
 import zipfile
+import datetime
 
-
-filemask = '/home/admin/archive/archive*.zip'
+filemask = '/mnt/nebula/callrec_backups/callrecus/calls/archive*'
 files = glob.glob(filemask)
 
-database = 'callrec'
+database = 'callrectest'
 port = 5432
 user = 'callrec'
 password = 'callrec'
 hostname = 'localhost'
 callrec = pg.DB(database, hostname, 5432, None, None, user, password)
 
-callQuery = "insert into calls (id, cplcnt, start_ts, stop_ts, length) values ({0}, '{1}', '{2}', '{3}', '{4}')"
+callQuery = "insert into calls (id, cplcnt, start_ts, stop_ts, length, realcplcnt) values ({0}, '{1}', '{2}', '{3}', '{4}', '0')"
 couplesQuery = '''insert into couples
 (id, 
 callid, 
@@ -78,47 +79,53 @@ def xmlToDict(root):
 
 def updateCalls(filename = ''):
 	for i in callDict:
-		call = i['call']['value']
-		callrec.query(callQuery.format(
-			call['id'],
-			i['call']['cplcnt'],
-			call['start'], 
-			call['stop'], 
-			call['length']))
+		try: 
+			call = i['call']['value']
+			callrec.query(callQuery.format(
+				call['id'],
+				i['call']['cplcnt'],
+				call['start'], 
+				call['stop'], 
+				call['length']))
 
-		for couple in i['call']['couples']:
-			callrec.query(couplesQuery.format(
-				couple['value']['id'], 
-				call['id'], 
-				couple['value']['start'], 
-				couple['value']['stop'],
-				couple['value']['length'],
-				couple['cfcnt'],
-				couple['callingIP'],
-				couple['calledIP'],
-				couple['callingNr'],
-				couple['originalCalledNr'],
-				couple['finalCalledNr'],
-				couple['callingPartyName'],
-				couple['calledPartyName'],
-				couple['cpltype'],
-				couple['problemStatus'],
-				couple['description'],
-				'f',
-				couple['sid'],
-				couple['synchroFlag'],
-				'D',
-				'A',
-				'ARC',
-				filename,
-				couple['state'],
-				couple['coupleDirection'],
-				couple['dayOfWeek'],
-				couple['timeOfDay']
-				))
+			for couple in i['call']['couples']:
+				callrec.query(couplesQuery.format(
+					couple['value']['id'], 
+					call['id'], 
+					couple['value']['start'], 
+					couple['value']['stop'],
+					couple['value']['length'],
+					couple['cfcnt'],
+					couple['callingIP'],
+					couple['calledIP'],
+					couple['callingNr'],
+					couple['originalCalledNr'],
+					couple['finalCalledNr'],
+					couple['callingPartyName'],
+					couple['calledPartyName'],
+					couple['cpltype'],
+					couple['problemStatus'],
+					couple['description'],
+					'f',
+					couple['sid'],
+					couple['synchroFlag'],
+					'D',
+					'A',
+					'ARC',
+					os.path.basename(filename),
+					couple['state'],
+					couple['coupleDirection'],
+					couple['dayOfWeek'],
+					couple['timeOfDay']
+					))
 
-			for dataValue in couple['data']:
-				callrec.query(extDataQuery.format(couple['value']['id'], dataValue.keys()[0], dataValue[dataValue.keys()[0]]))
+				for dataValue in couple['data']:
+					callrec.query(extDataQuery.format(couple['value']['id'], dataValue.keys()[0], dataValue[dataValue.keys()[0]]))
+
+		except Exception, e: 
+			f = open('/opt/callrec/logs/restore_archive_db.log', 'a+')
+			f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M ") + str(e))
+			f.close()
 
 for filename in files:
 
@@ -129,3 +136,6 @@ for filename in files:
 
 	xmlToDict(root)
 	updateCalls(filename)
+
+callrec.close()
+
